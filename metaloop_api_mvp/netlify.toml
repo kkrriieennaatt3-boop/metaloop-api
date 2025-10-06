@@ -1,3 +1,4 @@
 [build]
-  functions = "netlify/functions"
-  publish = "."
+  # リポジトリ（ルート）からの相対パスで指定
+  publish = "metaloop_api_mvp"
+  functions = "metaloop_api_mvp/netlify/functions"
