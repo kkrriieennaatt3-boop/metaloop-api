@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MetaLoop | 閉ループ診断（API版）</title>
+  <style>
+    body{font:14px/1.7 system-ui,-apple-system,Segoe UI,Roboto,Inter; margin:0; background:#f8fafc; color:#111}
+    header{position:sticky;top:0;z-index:1;background:#fff;border-bottom:1px solid #e5e7eb;padding:10px 16px;display:flex;justify-content:space-between}
+    .container{max-width:980px;margin:0 auto;padding:16px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin:12px 0}
+    h1{font-size:22px;margin:.2em 0} h2{font-size:18px;margin:.2em 0}
+    textarea{width:100%;min-height:100px;border:1px solid #e5e7eb;border-radius:10px;padding:10px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+    button{border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;background:#fff;cursor:pointer}
+    .primary{background:#4f46e5;color:#fff;border:none}
+    .muted{color:#6b7280}
+    .score{font-size:36px;font-weight:800}
+    pre{white-space:pre-wrap}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid #e5e7eb;background:#fff;font-size:12px;margin-right:6px}
+  </style>
+</head>
+<body>
+<header>
+  <strong>MetaLoop — 閉ループ診断</strong>
+  <span class="muted">API版（GPT採点）</span>
+</header>
+<main class="container">
+  <section class="card">
+    <h1>仕組みを作るための仕組み — 閉ループ診断</h1>
+    <p>7項目（Why/Who/Value/Delivery/Money/Feedback/Driver）を入力して<b>GPTで5軸採点＋合成スコア</b>を返します。</p>
+    <div>
+      <span class="pill">顧客↔価値</span>
+      <span class="pill">価値↔収益</span>
+      <span class="pill">収益↔改善</span>
+      <span class="pill">改善↔顧客価値</span>
+      <span class="pill">継続動機</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>① 事業の骨格（7フィールド）</h2>
+    <div class="grid">
+      <label>目的（WHY）<textarea id="why" placeholder="何を実現する事業か"></textarea></label>
+      <label>顧客（WHO）<textarea id="who" placeholder="誰に価値を提供するか"></textarea></label>
+      <label>提供価値（VALUE）<textarea id="value" placeholder="顧客が得る価値は？"></textarea></label>
+      <label>価値経路（HOW/Delivery）<textarea id="delivery" placeholder="どうやって価値を届けるか"></textarea></label>
+      <label>収益構造（MONEY）<textarea id="money" placeholder="どこでお金が発生するか（価格/課金点/継続収益）"></textarea></label>
+      <label>フィードバック経路（FEEDBACK）<textarea id="feedback" placeholder="顧客行動がどう改善に戻るか"></textarea></label>
+      <label>継続トリガー（LOOP DRIVER）<textarea id="driver" placeholder="習慣/コミュニティ/ネットワーク効果/成果可視化など"></textarea></label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="primary" id="scoreBtn">GPTで採点</button>
+      <button id="clearBtn">クリア</button>
+      <span id="status" class="muted"></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>② 結果</h2>
+    <div class="row">
+      <div>
+        <div id="total" class="score">--%</div>
+        <div class="muted">閉ループ率（重み 0.25/0.25/0.20/0.15/0.15）</div>
+      </div>
+      <div id="axes"></div>
+    </div>
+    <pre id="advice" style="margin-top:10px"></pre>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+$('#clearBtn').onclick = () => document.querySelectorAll('textarea').forEach(t => t.value = '');
+
+$('#scoreBtn').onclick = async () => {
+  const payload = {
+    why: $('#why').value, who: $('#who').value, value: $('#value').value,
+    delivery: $('#delivery').value, money: $('#money').value,
+    feedback: $('#feedback').value, driver: $('#driver').value
+  };
+  $('#status').textContent = '採点中…';
+  $('#total').textContent = '--%'; $('#axes').textContent=''; $('#advice').textContent='';
+
+  try {
+    const r = await fetch('/.netlify/functions/score', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await r.json();
+
+    let parsed = null;
+    if (data?.output && Array.isArray(data.output)) {
+      const txt = data.output[0]?.content?.[0]?.text || data.output_text || '';
+      if (typeof txt === 'string' && txt.trim().startsWith('{')) parsed = JSON.parse(txt);
+    }
+    if (!parsed && data?.choices && data.choices[0]?.message?.content) {
+      const txt = data.choices[0].message.content;
+      if (typeof txt === 'string' && txt.trim().startsWith('{')) parsed = JSON.parse(txt);
+    }
+    if (!parsed && data?.axes && data?.total !== undefined) parsed = data;
+    if (!parsed) throw new Error('Unexpected response shape');
+
+    $('#total').textContent = (parsed.total ?? 0) + '%';
+    $('#axes').textContent = '軸: ' + (parsed.axes || []).join(', ');
+    $('#advice').textContent = parsed.advice || '';
+  } catch (e) {
+    console.error(e);
+    $('#advice').textContent = 'エラー: ' + e.message;
+  } finally {
+    $('#status').textContent = '';
+  }
+};
+</script>
+</body>
+</html>
