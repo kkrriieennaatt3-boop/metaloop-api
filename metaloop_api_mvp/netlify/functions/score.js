@@ -112,22 +112,23 @@ total = round( Σ(weight_i * axis_i) )。境界は整数(0–100)。
 
     const user = `入力: ${JSON.stringify(payload)}`;
 
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user }
-        ],
-        temperature: 0.2
-      })
-    });
+   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    model: "gpt-4o-mini",           // 精度を上げたい時は "gpt-4o"
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: `入力: ${JSON.stringify(payload)}` }
+    ],
+    **temperature: 0.2,**            // 論理のブレを抑える
+    **max_tokens: 1200**             // 詳細分析を出せるよう上限UP
+  })
+});
 
     const data = await resp.json();
     return { statusCode: 200, body: JSON.stringify(data) };
